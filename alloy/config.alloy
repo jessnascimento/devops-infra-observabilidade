@@ -1,3 +1,4 @@
+
 otelcol.receiver.otlp "default" {
   grpc {
     endpoint = "0.0.0.0:4317"
@@ -25,13 +26,13 @@ otelcol.processor.batch "default" {
 otelcol.auth.headers "grafana_cloud" {
   header {
     key   = "Authorization"
-    value = env("GRAFANA_CLOUD_AUTHORIZATION")
+    value = sys.env("GRAFANA_CLOUD_AUTHORIZATION")
   }
 }
 
 otelcol.exporter.otlphttp "grafana_cloud" {
   client {
-    endpoint = env("OTEL_EXPORTER_OTLP_ENDPOINT")
+    endpoint = sys.env("OTEL_EXPORTER_OTLP_ENDPOINT")
     auth     = otelcol.auth.headers.grafana_cloud.handler
   }
 }
