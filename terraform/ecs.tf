@@ -15,6 +15,7 @@ resource "aws_ecs_task_definition" "app" {
   memory = "1024"
 
   execution_role_arn = aws_iam_role.ecs_execution.arn
+  task_role_arn = "arn:aws:iam::345856463400:role/projeto-observabilidade-ecs-task-role"
 
   container_definitions = jsonencode([
 
