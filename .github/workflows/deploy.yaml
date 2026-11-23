@@ -43,19 +43,6 @@ jobs:
           path: state
           persist-credentials: true
 
-      # Recupera o estado existente
-      - name: Restore Terraform State
-        run: |
-          if [ ! -f ../state/terraform.tfstate ]; then
-            echo "ERRO: terraform.tfstate não encontrado na branch terraform-state."
-            echo "Importe os recursos existentes antes de executar o deploy."
-            exit 1
-          fi
-
-          cp ../state/terraform.tfstate ./terraform.tfstate
-
-          echo "Terraform State recuperado com sucesso."
-
       # Configuração AWS via OIDC
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -106,29 +93,3 @@ jobs:
         run: terraform apply -input=false -auto-approve
         env:
           TF_VAR_grafana_secret_arn: ${{ vars.TF_VAR_grafana_secret_arn }}
-
-      # Salva o estado atualizado no GitHub
-      - name: Save Terraform State
-        if: always() && github.ref == 'refs/heads/main'
-        working-directory: .
-        run: |
-          if [ ! -f terraform/terraform.tfstate ]; then
-            echo "Nenhum Terraform State encontrado para salvar."
-            exit 1
-          fi
-
-          cp terraform/terraform.tfstate state/terraform.tfstate
-
-          cd state
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -f terraform.tfstate
-
-          if git diff --cached --quiet; then
-            echo "Nenhuma alteração no Terraform State."
-          else
-            git commit -m "chore: update Terraform state"
-            git push origin terraform-state
-          fi
