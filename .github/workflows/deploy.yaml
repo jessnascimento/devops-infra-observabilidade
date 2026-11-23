@@ -1,3 +1,4 @@
+
 name: Deploy Infrastructure
 
 on:
@@ -13,7 +14,12 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
+
+# Impede duas execuções simultâneas modificando o mesmo estado
+concurrency:
+  group: terraform-infrastructure
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -25,16 +31,39 @@ jobs:
         working-directory: terraform
 
     steps:
+      # Checkout do repositório principal
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Checkout da branch que armazena o Terraform State
+      - name: Checkout Terraform State
+        uses: actions/checkout@v4
+        with:
+          ref: terraform-state
+          path: state
+          persist-credentials: true
+
+      # Recupera o estado existente
+      - name: Restore Terraform State
+        run: |
+          if [ ! -f ../state/terraform.tfstate ]; then
+            echo "ERRO: terraform.tfstate não encontrado na branch terraform-state."
+            echo "Importe os recursos existentes antes de executar o deploy."
+            exit 1
+          fi
+
+          cp ../state/terraform.tfstate ./terraform.tfstate
+
+          echo "Terraform State recuperado com sucesso."
+
+      # Configuração AWS via OIDC
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-       # Login no ECR
+      # Login no ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -54,6 +83,7 @@ jobs:
             ${{ steps.login-ecr.outputs.registry }}/projeto-observabilidade-alloy:latest
         working-directory: .
 
+      # Configuração Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -61,19 +91,44 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
 
       - name: Terraform Validate
         run: terraform validate
-     
+
       - name: Terraform Plan
-        run: terraform plan
+        run: terraform plan -input=false
         env:
           TF_VAR_grafana_secret_arn: ${{ vars.TF_VAR_grafana_secret_arn }}
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve
+        run: terraform apply -input=false -auto-approve
         env:
           TF_VAR_grafana_secret_arn: ${{ vars.TF_VAR_grafana_secret_arn }}
 
+      # Salva o estado atualizado no GitHub
+      - name: Save Terraform State
+        if: always() && github.ref == 'refs/heads/main'
+        working-directory: .
+        run: |
+          if [ ! -f terraform/terraform.tfstate ]; then
+            echo "Nenhum Terraform State encontrado para salvar."
+            exit 1
+          fi
+
+          cp terraform/terraform.tfstate state/terraform.tfstate
+
+          cd state
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f terraform.tfstate
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração no Terraform State."
+          else
+            git commit -m "chore: update Terraform state"
+            git push origin terraform-state
+          fi

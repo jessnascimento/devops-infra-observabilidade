@@ -81,7 +81,7 @@ resource "aws_ecs_task_definition" "app" {
       secrets = [
         {
           name      = "GRAFANA_CLOUD_AUTHORIZATION"
-          valueFrom = var.grafana_secret_arn
+          valueFrom = "${var.grafana_secret_arn}:GRAFANA_CLOUD_AUTHORIZATION::"
         }
       ]
     }
