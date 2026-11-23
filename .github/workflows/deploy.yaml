@@ -39,21 +39,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Build e publicação da imagem Alloy
-      - name: Build and Push Alloy Image
-        run: |
-          docker build \
-            -f alloy/Dockerfile \
-            -t projeto-observabilidade-alloy:latest \
-            .
-
-          docker tag projeto-observabilidade-alloy:latest \
-            ${{ steps.login-ecr.outputs.registry }}/projeto-observabilidade-alloy:latest
-
-          docker push \
-            ${{ steps.login-ecr.outputs.registry }}/projeto-observabilidade-alloy:latest
-        working-directory: .
-
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
