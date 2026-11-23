@@ -1,3 +1,4 @@
+
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
   name = "${var.project_name}-cluster"
@@ -14,7 +15,10 @@ resource "aws_ecs_task_definition" "app" {
   cpu    = "512"
   memory = "1024"
 
+  # Permissão para o ECS buscar imagens e secrets
   execution_role_arn = aws_iam_role.ecs_execution.arn
+
+  # Permissão para o ECS Exec
   task_role_arn = "arn:aws:iam::345856463400:role/projeto-observabilidade-ecs-task-role"
 
   container_definitions = jsonencode([
