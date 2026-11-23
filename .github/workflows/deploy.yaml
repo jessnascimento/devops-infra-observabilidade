@@ -68,7 +68,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Build e publicação da imagem Alloy
+            # Build e publicação da imagem Alloy
       - name: Build and Push Alloy Image
         run: |
           docker build \
