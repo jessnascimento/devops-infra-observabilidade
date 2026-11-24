@@ -2,19 +2,20 @@
 name: Deploy Infrastructure
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'terraform/**'
-      - 'alloy/**'
-      - '.github/workflows/deploy.yml'
-
   workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply immediately after planning (review a plan-only run first)
+        type: boolean
+        default: false
+      enable_https:
+        description: Enable HTTPS after the ACM certificate is issued
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
 
 # Impede duas execuções simultâneas modificando o mesmo estado
 concurrency:
@@ -44,11 +45,13 @@ jobs:
 
       # Login no ECR
       - name: Login to Amazon ECR
+        if: inputs.apply && github.ref == 'refs/heads/main'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       # Build e publicação da imagem Alloy
       - name: Build and Push Alloy Image
+        if: inputs.apply && github.ref == 'refs/heads/main'
         run: |
           docker build \
             -f alloy/Dockerfile \
@@ -65,23 +68,33 @@ jobs:
       # Configuração Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
 
       - name: Terraform Format
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
 
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -input=false
+        run: terraform plan -input=false -out=tfplan
         env:
           TF_VAR_grafana_secret_arn: ${{ vars.TF_VAR_grafana_secret_arn }}
+          TF_VAR_hosted_zone_id: ${{ vars.ROUTE53_HOSTED_ZONE_ID }}
+          TF_VAR_app_hostname: ${{ vars.APP_HOSTNAME }}
+          TF_VAR_enable_https: ${{ inputs.enable_https }}
+          TF_VAR_health_check_path: ${{ vars.HEALTH_CHECK_PATH || '/' }}
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -input=false -auto-approve
+        if: github.ref == 'refs/heads/main' && inputs.apply
+        run: terraform apply -input=false tfplan
         env:
           TF_VAR_grafana_secret_arn: ${{ vars.TF_VAR_grafana_secret_arn }}
+          TF_VAR_hosted_zone_id: ${{ vars.ROUTE53_HOSTED_ZONE_ID }}
+          TF_VAR_app_hostname: ${{ vars.APP_HOSTNAME }}
+          TF_VAR_enable_https: ${{ inputs.enable_https }}
+          TF_VAR_health_check_path: ${{ vars.HEALTH_CHECK_PATH || '/' }}

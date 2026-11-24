@@ -34,8 +34,12 @@ output "security_group_id" {
   value       = aws_security_group.app.id
 }
 
-output "get_public_ip_command" {
-  description = "Comando para consultar o IP público da aplicação"
+output "application_url" {
+  description = "Application HTTP URL; HTTPS is also available when enabled"
+  value       = "http://${var.app_hostname}"
+}
 
-  value = "TASK=$(aws ecs list-tasks --cluster ${aws_ecs_cluster.main.name} --service-name ${aws_ecs_service.app.name} --query 'taskArns[0]' --output text) && ENI=$(aws ecs describe-tasks --cluster ${aws_ecs_cluster.main.name} --tasks $TASK --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value | [0]' --output text) && aws ec2 describe-network-interfaces --network-interface-ids $ENI --query 'NetworkInterfaces[0].Association.PublicIp' --output text"
+output "certificate_arn" {
+  description = "ACM certificate ARN for checking issuance before enabling HTTPS"
+  value       = aws_acm_certificate.app.arn
 }
